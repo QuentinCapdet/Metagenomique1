@@ -26,14 +26,16 @@ from typing import Iterator, Dict, List
 # https://github.com/briney/nwalign3
 # ftp://ftp.ncbi.nih.gov/blast/matrices/
 import nwalign3 as nw
+import numpy as np
+np.int = int
 
-__author__ = "Your Name"
+__author__ = "Quentin"
 __copyright__ = "Universite Paris Diderot"
-__credits__ = ["Your Name"]
+__credits__ = ["Quentin"]
 __license__ = "GPL"
 __version__ = "1.0.0"
-__maintainer__ = "Your Name"
-__email__ = "your@email.fr"
+__maintainer__ = "Quentin"
+__email__ = "quentin.capder@gmail.com"
 __status__ = "Developpement"
 
 
@@ -84,7 +86,19 @@ def read_fasta(amplicon_file: Path, minseqlen: int) -> Iterator[str]:
     :param minseqlen: (int) Minimum amplicon sequence length
     :return: A generator object that provides the Fasta sequences (str).
     """
-    pass
+    with gzip.open(amplicon_file, "rt") as  monfich:
+        seq = ""
+
+        for line in monfich:
+            if not line.startswith(">"):
+                seq += line.strip()
+            else:
+                "".join(seq)
+                if len(seq) >= minseqlen:
+                    yield seq
+                seq = ""
+    if len(seq) >= minseqlen:
+                yield seq
 
 
 def dereplication_fulllength(amplicon_file: Path, minseqlen: int, mincount: int) -> Iterator[List]:
@@ -95,7 +109,17 @@ def dereplication_fulllength(amplicon_file: Path, minseqlen: int, mincount: int)
     :param mincount: (int) Minimum amplicon count
     :return: A generator object that provides a (list)[sequences, count] of sequence with a count >= mincount and a length >= minseqlen.
     """
-    pass
+    seq_count = dict()
+
+    for seq in read_fasta(amplicon_file, minseqlen):
+        if seq in seq_count:
+            seq_count[seq] += 1
+        else:
+            seq_count[seq] = 1
+    for key in sorted(seq_count, key = seq_count.get, reverse=True):
+        if seq_count[key] >= mincount:
+            yield key, seq_count[key]
+                
 
 def get_identity(alignment_list: List[str]) -> float:
     """Compute the identity rate between two sequences
@@ -103,7 +127,18 @@ def get_identity(alignment_list: List[str]) -> float:
     :param alignment_list:  (list) A list of aligned sequences in the format ["SE-QUENCE1", "SE-QUENCE2"]
     :return: (float) The rate of identity between the two sequences.
     """
-    pass
+    seq1 = alignment_list[0]
+    seq2 = alignment_list[1]
+    count = 0
+    
+    for nt in range(len(seq1)):
+        if seq1[nt] == seq2[nt]:
+            count += 1
+        
+    id = (count/len(seq1)) * 100
+    
+    return round(id, 2)
+
 
 def abundance_greedy_clustering(amplicon_file: Path, minseqlen: int, mincount: int, chunk_size: int, kmer_size: int) -> List:
     """Compute an abundance greedy clustering regarding sequence count and identity.
@@ -116,7 +151,20 @@ def abundance_greedy_clustering(amplicon_file: Path, minseqlen: int, mincount: i
     :param kmer_size: (int) A fournir mais non utilise cette annee
     :return: (list) A list of all the [OTU (str), count (int)] .
     """
-    pass
+    OTU_list = []
+    seqs = list(dereplication_fulllength(amplicon_file, minseqlen, mincount))
+    print(seqs[0])
+    OTU_list.append(list(seqs[0]))
+
+    for i in range(1, len(seqs)):
+        for j in range(len(OTU_list)):
+            align = nw.global_align(OTU_list[j][0], seqs[i][0], gap_open=-1, gap_extend=-1, matrix=str(Path(__file__).parent / "MATCH"))
+            if get_identity(align) >= 97:
+                break
+            else:
+                OTU_list.append(list(seqs[i]))
+    return OTU_list
+
 
 
 def write_OTU(OTU_list: List, output_file: Path) -> None:
@@ -125,7 +173,11 @@ def write_OTU(OTU_list: List, output_file: Path) -> None:
     :param OTU_list: (list) A list of OTU sequences
     :param output_file: (Path) Path to the output file
     """
-    pass
+    with open(output_file, "w") as file:
+        for i, val in enumerate(OTU_list):
+            OTU = val[0]
+            wrap = textwrap.fill(OTU, width=80)
+            file.write(f'>OTU_{i+1} occurrence:{val[1]}\n{wrap}\n')
 
 
 #==============================================================
