@@ -153,7 +153,6 @@ def abundance_greedy_clustering(amplicon_file: Path, minseqlen: int, mincount: i
     """
     OTU_list = []
     seqs = list(dereplication_fulllength(amplicon_file, minseqlen, mincount))
-    print(seqs[0])
     OTU_list.append(list(seqs[0]))
 
     for i in range(1, len(seqs)):
@@ -190,6 +189,9 @@ def main(): # pragma: no cover
     # Get arguments
     args = get_arguments()
     # Votre programme ici
+    abundance = abundance_greedy_clustering(args.amplicon_file, args.minseqlen, args.mincount, 0, 0)
+    write_OTU(abundance, args.output_file)
+
 
 
 
